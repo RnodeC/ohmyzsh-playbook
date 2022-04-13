@@ -1,0 +1,85 @@
+---
+- when: "ansible_os_family | lower == 'debian'"
+  become: true
+  block:
+  - name: apt-get update
+    apt:
+      update_cache: true
+      cache_valid_time: 3600
+
+  - name: Upgrade the OS (apt-get dist-upgrade)
+    apt:
+      upgrade: dist
+
+  - name: Install required packages
+    apt:
+      pkg:
+        - build-essential
+        - curl
+        - file
+        - git
+      state: present
+
+  - name: Install zsh
+    apt:
+      pkg: zsh
+      state: present
+
+- name: Verify zsh
+  command: zsh --version
+  register: zshinstalled
+  changed_when: false
+
+- fail:
+  name: Fail now if zsh was not installed
+  when: zshinstalled.rc != 0
+
+- name: Get OhMyZsh install script
+  get_url:
+    url: https://raw.github.com/robbyrussell/oh-my-zsh/master/tools/install.sh
+    dest: ~/install.sh
+    mode: 0755
+
+- name: >
+    Determine if install script has ran before
+    (to force a re-run, delete ~/.oh-my-zsh)
+  stat:
+    path: ~/.oh-my-zsh
+  register: omz
+
+- name: Install OhMyZsh
+  script: ~/install.sh
+  args:
+    creates: ~/.zshrc
+  when: not omz.stat.exists
+
+- name: Load Plugins
+  lineinfile:
+    regexp: ^plugins=.*
+    line: "plugins=({{ zsh_plugins }})"
+    state: present
+    path: ~/.zshrc
+
+- name: Load Theme
+  lineinfile:
+    regexp: ^ZSH_THEME=.*
+    line: "ZSH_THEME=\"{{ zsh_theme }}\""
+    state: present
+    path: ~/.zshrc
+
+- name: Remove install.sh script.  No longer needed
+  file:
+    path: ~/install.sh
+    state: absent
+
+- tags: ['never', 'uninstall']
+  block:
+    - name: Uninstall OhMyZsh - restore original .zshrc
+      copy:
+        src: ~/.zshrc.pre-oh-my-zsh
+        dest: ~/.zshrc
+
+    - name: Uninstall OhMyZsh - Delete ~/.oh-my-zsh dir
+      file:
+        path: ~/.oh-my-zsh
+        state: absent

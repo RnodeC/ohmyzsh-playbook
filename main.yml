@@ -1,0 +1,9 @@
+---
+- hosts: localhost
+  become: false
+
+  tasks:
+  - import_tasks: tasks/ohmyzsh.yml
+    vars:
+      zsh_plugins: vscode git kubectl
+      zsh_theme: philips
